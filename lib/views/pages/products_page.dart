@@ -14,6 +14,13 @@ class ProductsPage extends ConsumerStatefulWidget {
 
 class _ProductsPageState extends ConsumerState<ProductsPage> {
   @override
+  void initState() {
+    // TODO: implement initState
+    ref.refresh(productProvider);
+    super.initState();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final productAsyncValue = ref.watch(productProvider);
     final user = ref.watch(localUserProvider);

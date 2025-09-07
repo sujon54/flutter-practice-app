@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:first_flutter_app/data/providers/auth_provider.dart';
 import 'package:first_flutter_app/data/providers/categories_provder.dart';
 import 'package:first_flutter_app/data/providers/products_provider.dart'
@@ -6,6 +8,7 @@ import 'package:first_flutter_app/data/services/product_api.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 
 class AddProductPage extends ConsumerStatefulWidget {
   const AddProductPage({super.key});
@@ -22,8 +25,21 @@ class _AddProductPageState extends ConsumerState<AddProductPage> {
   String stock = '';
   String imageUrl = '';
   int? selectedCategoryId;
+  File? _imageFile;
 
   bool isLoading = false;
+
+  final ImagePicker _picker = ImagePicker();
+
+  Future<void> _pickImage(ImageSource source) async {
+    final XFile? pickedFile = await _picker.pickImage(source: source);
+
+    if (pickedFile != null) {
+      setState(() {
+        _imageFile = File(pickedFile.path);
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -70,12 +86,37 @@ class _AddProductPageState extends ConsumerState<AddProductPage> {
                     validator: (value) => value!.isEmpty ? 'Enter stock' : null,
                   ),
                   const SizedBox(height: 10),
-                  TextFormField(
-                    decoration: const InputDecoration(labelText: 'Image URL'),
-                    onSaved: (value) => imageUrl = value!.trim(),
-                    validator: (value) =>
-                        value!.isEmpty ? 'Enter image URL' : null,
+                  _imageFile != null
+                      ? Image.file(
+                          _imageFile!,
+                          width: 200,
+                          height: 200,
+                          fit: BoxFit.cover,
+                        )
+                      : const Text('No image selected'),
+
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: () => _pickImage(ImageSource.gallery),
+                        icon: const Icon(Icons.image),
+                        label: const Text('Pick from Gallery'),
+                      ),
+                      SizedBox(width: 10),
+                      ElevatedButton.icon(
+                        onPressed: () => _pickImage(ImageSource.camera),
+                        icon: const Icon(Icons.camera),
+                        label: const Text('Take a Photo'),
+                      ),
+                    ],
                   ),
+                  // TextFormField(
+                  //   decoration: const InputDecoration(labelText: 'Image URL'),
+                  //   onSaved: (value) => imageUrl = value!.trim(),
+                  //   validator: (value) =>
+                  //       value!.isEmpty ? 'Enter image URL' : null,
+                  // ),
                   const SizedBox(height: 10),
                   DropdownButtonFormField<int>(
                     value: selectedCategoryId,
@@ -124,17 +165,30 @@ class _AddProductPageState extends ConsumerState<AddProductPage> {
     _formKey.currentState!.save();
     setState(() => isLoading = true);
 
+    if (_imageFile == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('No image selected')));
+      return;
+    }
+
     final token = ref.read(authTokenProvider) ?? '';
 
-    http.Response response = await ProductApi.addProduct(
+    final streamedResponse = await ProductApi.addProduct(
       name: name,
       price: price,
       stock: stock,
       description: description,
-      imageUrl: imageUrl,
+      image: _imageFile!,
       categoryId: selectedCategoryId!,
       token: token,
     );
+
+    // ✅ Read response body from streamed response
+    final response = await http.Response.fromStream(streamedResponse);
+
+    print('Status code: ${response.statusCode}');
+    print('Body: ${response.body}');
 
     setState(() => isLoading = false);
 
